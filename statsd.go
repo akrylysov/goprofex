@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -13,14 +13,22 @@ type StatsD struct {
 	SampleRate float64
 }
 
+var reservedReplacer = strings.NewReplacer(":", "_", "|", "_", "@", "_")
+
 func (s *StatsD) Send(stat string, kind string, delta float64) {
-	buf := fmt.Sprintf("%s.", s.Namespace)
-	trimmedStat := strings.NewReplacer(":", "_", "|", "_", "@", "_").Replace(stat)
-	buf += fmt.Sprintf("%s:%s|%s", trimmedStat, delta, kind)
+	buf := bytes.Buffer{}
+	buf.WriteString(s.Namespace)
+	buf.WriteByte('.')
+	buf.WriteString(reservedReplacer.Replace(stat))
+	buf.WriteByte(':')
+	buf.Write(strconv.AppendFloat(make([]byte, 0, 24), delta, 'f', -1, 64))
+	buf.WriteByte('|')
+	buf.WriteString(kind)
 	if s.SampleRate != 0 && s.SampleRate < 1 {
-		buf += fmt.Sprintf("|@%s", strconv.FormatFloat(s.SampleRate, 'f', -1, 64))
+		buf.WriteString("|@")
+		buf.Write(strconv.AppendFloat(make([]byte, 0, 24), s.SampleRate, 'f', -1, 64))
 	}
-	ioutil.Discard.Write([]byte(buf)) // TODO: Write to a socket
+	buf.WriteTo(ioutil.Discard) // TODO: Write to a socket
 }
 
 func (s *StatsD) Incr(stat string) {

@@ -14,13 +14,13 @@ type leftpadResponse struct {
 }
 
 func timedHandler(name string, nextFunc http.HandlerFunc) http.HandlerFunc {
+	timingMetric := fmt.Sprintf("request.%s.timing", name)
+	countMetric := fmt.Sprintf("request.%s.count", name)
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		nextFunc(w, r)
-		elapsed := time.Since(start)
-		statsd.Timing(fmt.Sprintf("request.%s.timing", name), elapsed)
-		statsd.Incr(fmt.Sprintf("request.%s.count", name))
-		log.Printf("%s request took %v", name, elapsed)
+		statsd.Timing(timingMetric, time.Since(start))
+		statsd.Incr(countMetric)
 	}
 }
 
